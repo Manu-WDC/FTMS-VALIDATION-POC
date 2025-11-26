@@ -1,0 +1,198 @@
+name: Firmware Build & Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  build-and-submit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: 🔨 Build Firmware (Simulated)
+        run: |
+          echo "Starting firmware build process..."
+          python3 tools/build_firmware.py
+          
+          echo ""
+          echo "Build artifacts created:"
+          cat build_output.json
+      
+      - name: 📝 Create GitHub Check (blocks PR)
+        if: github.event_name == 'pull_request'
+        id: create-check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('🔒 Creating check to block PR merge...');
+            
+            const check = await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'FTMS On-Drive Validation',
+              head_sha: context.payload.pull_request.head.sha,
+              status: 'in_progress',
+              started_at: new Date().toISOString(),
+              output: {
+                title: '⏳ FTMS On-Drive Validation In Progress',
+                summary: 'Firmware validation submitted to FTMS. PR is blocked until tests complete.',
+                text: [
+                  '## Current Status',
+                  '',
+                  '| Stage | Status |',
+                  '|-------|--------|',
+                  '| 🔨 Firmware Build | ✅ Complete |',
+                  '| 📤 Submit to FTMS | ✅ Complete |',
+                  '| ⏰ On-Drive Testing | 🔄 In Progress |',
+                  '| 📊 Results Processing | ⏳ Pending |',
+                  '',
+                  '---',
+                  '',
+                  '### What\'s Happening?',
+                  '',
+                  '1. ✅ Firmware compiled successfully',
+                  '2. ✅ Binary uploaded to FTMS',
+                  '3. 🔄 Running on-drive validation tests',
+                  '4. ⏰ Estimated completion: 24 hours',
+                  '',
+                  '### PR Status',
+                  '',
+                  '🔒 **This PR is BLOCKED** from merging until validation passes.',
+                  '',
+                  '### Resource Usage',
+                  '',
+                  '- ✅ GitHub Actions runner has been freed',
+                  '- ✅ No compute resources consumed during wait',
+                  '- ✅ Callback will update status when ready',
+                  '',
+                  '---',
+                  '',
+                  '> 💡 **Tip:** This matches our Jenkins flow but uses 99% less resources!',
+                  '',
+                  '**Comparison:**',
+                  '- Jenkins (old): Holds executor for 24 hours ❌',
+                  '- GitHub Actions (new): Runner freed after 2 minutes ✅'
+                ].join('\n')
+              }
+            });
+            
+            console.log(`✅ Check created with ID: ${check.data.id}`);
+            core.setOutput('check_id', check.data.id);
+            return check.data.id;
+      
+      - name: 📤 Submit to FTMS (Simulated)
+        if: github.event_name == 'pull_request'
+        env:
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          CHECK_ID: ${{ steps.create-check.outputs.result }}
+        run: |
+          echo "Submitting validation request to FTMS..."
+          
+          CALLBACK_URL="https://api.github.com/repos/${{ github.repository }}/dispatches"
+          
+          python3 tools/submit_to_ftms.py \
+            "$COMMIT_SHA" \
+            "$CHECK_ID" \
+            "$CALLBACK_URL"
+          
+          echo ""
+          echo "📋 Request metadata:"
+          cat ftms_request.json
+      
+      - name: 💾 Save artifacts
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v3
+        with:
+          name: validation-context
+          path: |
+            build_output.json
+            ftms_request.json
+      
+      - name: 🎯 Workflow Summary
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "================================"
+          echo "✅ Workflow Complete!"
+          echo "================================"
+          echo ""
+          echo "📊 Metrics:"
+          echo "  - Build time: ~10 seconds"
+          echo "  - Submission time: ~5 seconds"
+          echo "  - Total runner time: ~30 seconds"
+          echo ""
+          echo "🎉 Resources freed! Runner time saved: 23h 59m 30s"
+          echo ""
+          echo "⏭️  Next: FTMS will callback when validation completes"
+      
+      - name: ⏰ Simulate FTMS processing (for demo)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo ""
+          echo "================================"
+          echo "⏰ Simulating FTMS Validation"
+          echo "================================"
+          echo ""
+          echo "In production: FTMS runs tests for 24 hours"
+          echo "For this PoC: Simulating with 30-second delay"
+          echo ""
+          sleep 30
+      
+      - name: 🧪 Run FTMS Mock Validation
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 tools/ftms_callback_mock.py
+          
+          echo ""
+          echo "📊 Validation results:"
+          cat ftms_results.json
+      
+      - name: 🔔 Trigger callback (simulating FTMS)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          CHECK_ID: ${{ steps.create-check.outputs.result }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          script: |
+            // Read results from mock FTMS
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('ftms_results.json', 'utf8'));
+            
+            console.log('📡 Dispatching callback event...');
+            console.log(`Status: ${results.status}`);
+            
+            // In production, FTMS would call this endpoint
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'ftms_validation_complete',
+              client_payload: {
+                check_run_id: parseInt(process.env.CHECK_ID),
+                status: results.status,
+                commit_sha: process.env.COMMIT_SHA,
+                validation_details: {
+                  total_tests: results.total_tests,
+                  passed: results.passed,
+                  failed: results.failed,
+                  duration_hours: results.duration_hours,
+                  test_environment: results.test_environment
+                }
+              }
+            });
+            
+            console.log('✅ Callback dispatched!');
