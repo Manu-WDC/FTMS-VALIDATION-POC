@@ -1,0 +1,138 @@
+name: Postman Callback Demo
+
+# This workflow exits IMMEDIATELY after creating the check
+# Use Postman to send the callback and unblock the PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  build-and-exit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔨 Build Firmware (Simulated)
+        run: |
+          echo "========================================"
+          echo "🔨 Building firmware..."
+          echo "========================================"
+          sleep 3
+          echo "✅ Build complete!"
+      
+      - name: 📝 Create Check (Blocks PR)
+        id: create-check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const check = await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'FTMS Postman Demo',
+              head_sha: context.payload.pull_request.head.sha,
+              status: 'in_progress',
+              started_at: new Date().toISOString(),
+              output: {
+                title: '⏳ Waiting for Postman Callback',
+                summary: '🔒 PR is BLOCKED. Use Postman to send callback.',
+                text: [
+                  '## 📮 How to Send Callback via Postman',
+                  '',
+                  '### Step 1: Open Postman',
+                  '',
+                  '### Step 2: Create PATCH Request',
+                  '',
+                  '**URL:**',
+                  '```',
+                  'https://api.github.com/repos/' + context.repo.owner + '/' + context.repo.repo + '/check-runs/' + check.data.id,
+                  '```',
+                  '',
+                  '### Step 3: Add Headers',
+                  '',
+                  '| Header | Value |',
+                  '|--------|-------|',
+                  '| Authorization | token YOUR_GITHUB_TOKEN |',
+                  '| Accept | application/vnd.github.v3+json |',
+                  '| Content-Type | application/json |',
+                  '',
+                  '### Step 4: Add Body (raw JSON)',
+                  '',
+                  '```json',
+                  '{',
+                  '  "status": "completed",',
+                  '  "conclusion": "success",',
+                  '  "output": {',
+                  '    "title": "✅ FTMS Validation PASSED",',
+                  '    "summary": "Callback received from Postman! PR is now unblocked."',
+                  '  }',
+                  '}',
+                  '```',
+                  '',
+                  '### Step 5: Click SEND',
+                  '',
+                  '---',
+                  '',
+                  '## 📋 Your Check Run ID: `' + check.data.id + '`',
+                  '',
+                  '---',
+                  '',
+                  '## 🎯 What This Proves',
+                  '',
+                  '1. ✅ Workflow exited in ~30 seconds (not 24 hours)',
+                  '2. ✅ PR is blocked until external callback',
+                  '3. ✅ Postman (external system) can update the check',
+                  '4. ✅ Resources are FREE during the wait'
+                ].join('\n')
+              }
+            });
+            
+            console.log('');
+            console.log('========================================');
+            console.log('✅ CHECK CREATED - PR IS BLOCKED');
+            console.log('========================================');
+            console.log('');
+            console.log('📋 CHECK RUN ID: ' + check.data.id);
+            console.log('');
+            console.log('Copy this ID and use it in Postman!');
+            console.log('');
+            console.log('========================================');
+      
+      - name: 📤 Submit to FTMS (Simulated)
+        run: |
+          echo ""
+          echo "========================================"
+          echo "📤 Submitting to FTMS..."
+          echo "========================================"
+          echo ""
+          echo "In production:"
+          echo "  - This would call real FTMS API"
+          echo "  - FTMS would run tests for 24 hours"
+          echo "  - FTMS would call back when done"
+          echo ""
+          echo "For this demo:"
+          echo "  - Use Postman to simulate callback"
+          echo ""
+      
+      - name: 🚀 Exit Workflow
+        run: |
+          echo ""
+          echo "========================================"
+          echo "🚀 WORKFLOW EXITING NOW!"
+          echo "========================================"
+          echo ""
+          echo "✅ Runner is now FREE"
+          echo "🔒 PR is BLOCKED (waiting for callback)"
+          echo ""
+          echo "📮 Use Postman to send callback"
+          echo "   and unblock the PR!"
+          echo ""
+          echo "========================================"
+
