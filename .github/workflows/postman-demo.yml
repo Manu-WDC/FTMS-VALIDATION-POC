@@ -9,7 +9,7 @@ on:
 
 permissions:
   checks: write
-  contents: read
+  contents: write
   pull-requests: read
 
 jobs:
@@ -65,10 +65,10 @@ jobs:
             console.log('========================================');
             console.log('');
             console.log('1. Open Postman');
-            console.log('2. Create a PATCH request');
+            console.log('2. Create a POST request');
             console.log('');
             console.log('URL:');
-            console.log(apiUrl);
+            console.log('https://api.github.com/repos/' + repoOwner + '/' + repoName + '/dispatches');
             console.log('');
             console.log('HEADERS:');
             console.log('  Authorization: token YOUR_GITHUB_TOKEN');
@@ -77,11 +77,10 @@ jobs:
             console.log('');
             console.log('BODY (raw JSON):');
             console.log('{');
-            console.log('  "status": "completed",');
-            console.log('  "conclusion": "success",');
-            console.log('  "output": {');
-            console.log('    "title": "✅ FTMS Validation PASSED",');
-            console.log('    "summary": "Callback from Postman! PR unblocked."');
+            console.log('  "event_type": "ftms_callback",');
+            console.log('  "client_payload": {');
+            console.log('    "check_run_id": ' + checkId + ',');
+            console.log('    "status": "PASS"');
             console.log('  }');
             console.log('}');
             console.log('');
