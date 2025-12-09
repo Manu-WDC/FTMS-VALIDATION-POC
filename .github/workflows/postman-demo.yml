@@ -33,77 +33,62 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            const headSha = context.payload.pull_request.head.sha;
+            
             const check = await github.rest.checks.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner: repoOwner,
+              repo: repoName,
               name: 'FTMS Postman Demo',
-              head_sha: context.payload.pull_request.head.sha,
+              head_sha: headSha,
               status: 'in_progress',
               started_at: new Date().toISOString(),
               output: {
                 title: '⏳ Waiting for Postman Callback',
-                summary: '🔒 PR is BLOCKED. Use Postman to send callback.',
-                text: [
-                  '## 📮 How to Send Callback via Postman',
-                  '',
-                  '### Step 1: Open Postman',
-                  '',
-                  '### Step 2: Create PATCH Request',
-                  '',
-                  '**URL:**',
-                  '```',
-                  'https://api.github.com/repos/' + context.repo.owner + '/' + context.repo.repo + '/check-runs/' + check.data.id,
-                  '```',
-                  '',
-                  '### Step 3: Add Headers',
-                  '',
-                  '| Header | Value |',
-                  '|--------|-------|',
-                  '| Authorization | token YOUR_GITHUB_TOKEN |',
-                  '| Accept | application/vnd.github.v3+json |',
-                  '| Content-Type | application/json |',
-                  '',
-                  '### Step 4: Add Body (raw JSON)',
-                  '',
-                  '```json',
-                  '{',
-                  '  "status": "completed",',
-                  '  "conclusion": "success",',
-                  '  "output": {',
-                  '    "title": "✅ FTMS Validation PASSED",',
-                  '    "summary": "Callback received from Postman! PR is now unblocked."',
-                  '  }',
-                  '}',
-                  '```',
-                  '',
-                  '### Step 5: Click SEND',
-                  '',
-                  '---',
-                  '',
-                  '## 📋 Your Check Run ID: `' + check.data.id + '`',
-                  '',
-                  '---',
-                  '',
-                  '## 🎯 What This Proves',
-                  '',
-                  '1. ✅ Workflow exited in ~30 seconds (not 24 hours)',
-                  '2. ✅ PR is blocked until external callback',
-                  '3. ✅ Postman (external system) can update the check',
-                  '4. ✅ Resources are FREE during the wait'
-                ].join('\n')
+                summary: '🔒 PR is BLOCKED. Use Postman to send callback. Check the workflow logs for the Check Run ID and instructions.'
               }
             });
+            
+            const checkId = check.data.id;
+            const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/check-runs/${checkId}`;
             
             console.log('');
             console.log('========================================');
             console.log('✅ CHECK CREATED - PR IS BLOCKED');
             console.log('========================================');
             console.log('');
-            console.log('📋 CHECK RUN ID: ' + check.data.id);
-            console.log('');
-            console.log('Copy this ID and use it in Postman!');
+            console.log('📋 CHECK RUN ID: ' + checkId);
             console.log('');
             console.log('========================================');
+            console.log('📮 POSTMAN INSTRUCTIONS');
+            console.log('========================================');
+            console.log('');
+            console.log('1. Open Postman');
+            console.log('2. Create a PATCH request');
+            console.log('');
+            console.log('URL:');
+            console.log(apiUrl);
+            console.log('');
+            console.log('HEADERS:');
+            console.log('  Authorization: token YOUR_GITHUB_TOKEN');
+            console.log('  Accept: application/vnd.github.v3+json');
+            console.log('  Content-Type: application/json');
+            console.log('');
+            console.log('BODY (raw JSON):');
+            console.log('{');
+            console.log('  "status": "completed",');
+            console.log('  "conclusion": "success",');
+            console.log('  "output": {');
+            console.log('    "title": "✅ FTMS Validation PASSED",');
+            console.log('    "summary": "Callback from Postman! PR unblocked."');
+            console.log('  }');
+            console.log('}');
+            console.log('');
+            console.log('========================================');
+            
+            core.setOutput('check_id', checkId);
+            core.setOutput('api_url', apiUrl);
       
       - name: 📤 Submit to FTMS (Simulated)
         run: |
@@ -134,5 +119,9 @@ jobs:
           echo "📮 Use Postman to send callback"
           echo "   and unblock the PR!"
           echo ""
+          echo "Look at the logs above for:"
+          echo "  - Check Run ID"
+          echo "  - API URL"
+          echo "  - Postman instructions"
+          echo ""
           echo "========================================"
-
