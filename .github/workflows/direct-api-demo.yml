@@ -1,0 +1,116 @@
+name: Direct API Demo (Zero Callback Resources)
+
+# This workflow creates check using GitHub App
+# So external systems can update it directly!
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build-and-exit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔨 Build Firmware (Simulated)
+        run: |
+          echo "========================================"
+          echo "🔨 Building firmware..."
+          echo "========================================"
+          sleep 3
+          echo "✅ Build complete!"
+      
+      - name: 🔑 Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      
+      - name: 📝 Create Check Using GitHub App
+        id: create-check
+        uses: actions/github-script@v7
+        env:
+          APP_TOKEN: ${{ steps.generate-token.outputs.token }}
+        with:
+          github-token: ${{ env.APP_TOKEN }}
+          script: |
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            const headSha = context.payload.pull_request.head.sha;
+            
+            const check = await github.rest.checks.create({
+              owner: repoOwner,
+              repo: repoName,
+              name: 'FTMS Direct API Demo',
+              head_sha: headSha,
+              status: 'in_progress',
+              started_at: new Date().toISOString(),
+              output: {
+                title: '⏳ Waiting for Direct API Callback',
+                summary: '🔒 PR is BLOCKED. Use Postman to directly update this check - NO WORKFLOW NEEDED!'
+              }
+            });
+            
+            const checkId = check.data.id;
+            
+            console.log('');
+            console.log('========================================');
+            console.log('✅ CHECK CREATED USING GITHUB APP');
+            console.log('========================================');
+            console.log('');
+            console.log('📋 CHECK RUN ID: ' + checkId);
+            console.log('');
+            console.log('========================================');
+            console.log('📮 POSTMAN SETUP (DIRECT API - NO WORKFLOW!)');
+            console.log('========================================');
+            console.log('');
+            console.log('Method: PATCH');
+            console.log('');
+            console.log('URL:');
+            console.log('https://api.github.com/repos/' + repoOwner + '/' + repoName + '/check-runs/' + checkId);
+            console.log('');
+            console.log('Headers:');
+            console.log('  Authorization: Bearer YOUR_APP_TOKEN');
+            console.log('  Accept: application/vnd.github.v3+json');
+            console.log('  Content-Type: application/json');
+            console.log('');
+            console.log('Body:');
+            console.log('{');
+            console.log('  "status": "completed",');
+            console.log('  "conclusion": "success",');
+            console.log('  "output": {');
+            console.log('    "title": "✅ FTMS Validation PASSED",');
+            console.log('    "summary": "Direct API - ZERO WORKFLOW RESOURCES!"');
+            console.log('  }');
+            console.log('}');
+            console.log('');
+            console.log('========================================');
+            console.log('');
+            console.log('🎯 KEY POINT:');
+            console.log('   When you send this from Postman,');
+            console.log('   NO GitHub workflow will run!');
+            console.log('   Check updates DIRECTLY via API.');
+            console.log('   ZERO additional resources used!');
+            console.log('');
+            console.log('========================================');
+      
+      - name: 🚀 Exit Workflow
+        run: |
+          echo ""
+          echo "========================================"
+          echo "🚀 WORKFLOW COMPLETE - EXITING!"
+          echo "========================================"
+          echo ""
+          echo "✅ Check created using GitHub App"
+          echo "✅ Runner is now FREE"
+          echo "🔒 PR is BLOCKED"
+          echo ""
+          echo "📮 Use Postman to update check directly"
+          echo "   NO workflow will be triggered!"
+          echo ""
+          echo "========================================"
+
